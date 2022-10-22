@@ -1,0 +1,121 @@
+﻿@page "/"
+
+@inherits LineBase
+
+<PageTitle>Index</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <h1>Hello @context.User.Identity?.Name</h1>
+        <button @onclick="BindNotify">綁定LineNotify</button>
+        <button @onclick="UnBindNotify">解除綁定LineNotify</button>
+        <button @onclick="signOut">登出</button>
+    </Authorized>
+    <NotAuthorized>
+        <button @onclick="Login">LineLogin</button>
+       
+    </NotAuthorized>
+    
+</AuthorizeView>
+ @if(!string.IsNullOrEmpty(ErrorString)) {
+    <p>@(ErrorString)。請稍後再試。</p>
+}
+@if(!string.IsNullOrEmpty(SuccessString))
+{
+    <p>@(SuccessString)。</p>
+}
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    protected bool IsError = false;
+    protected string ErrorString = "";
+    protected string SuccessString = "";
+    protected override void OnInitialized()
+    {
+        ErrorString = string.Empty;
+        SuccessString = string.Empty;
+        var uri = _navigation.ToAbsoluteUri(_navigation.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("errorType", out var _errorType))
+        {
+            int.TryParse(_errorType, out var errorType);
+            var errorTypeName = (ViewModels.loginError)errorType;
+            ErrorString = Enum.GetName(errorTypeName) ?? "";
+            StateHasChanged();
+        }
+        else if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("successType", out var _successType))
+        {
+            int.TryParse(_successType, out var successType);
+            var successTypeName = (ViewModels.loginSuccess)successType;
+            SuccessString = Enum.GetName(successTypeName) ?? "";
+            StateHasChanged();
+        }
+    }
+
+
+    protected void Login()
+    {
+        var clientId = config.GetValue<string>("Auth:LineLogin:Channel_ID");
+        var callback = config.GetValue<string>("Auth:LineLogin:CallBackUrl");
+        var state = _jwtService.GenerateToken();
+
+        string url = $"https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id={clientId}&state={state}&scope=openid email profile&redirect_uri={callback}";
+        _navigation.NavigateTo(url, true);
+        return;
+    }
+
+    protected void signOut()
+    {
+        _navigation.NavigateTo("/line/signOut", true);
+        return;
+    }
+
+    protected void BindNotify()
+    {
+        var clientId = config.GetValue<string>("Auth:LineNotify:Client_ID");
+        var callback = config.GetValue<string>("Auth:LineNotify:CallBackUrl");
+        var state = _jwtService.GenerateToken();
+        string url = $"https://notify-bot.line.me/oauth/authorize?response_type=code&client_id={clientId}&state={state}&scope=notify&redirect_uri={callback}";
+        _navigation.NavigateTo(url, true);
+        return;
+    }
+
+    protected async Task UnBindNotify()
+    {
+        ErrorString = string.Empty;
+        SuccessString = string.Empty;
+        try
+        {
+            var user = (await authenticationStateTask).User;
+            var idToken = user.Claims.Where(e => e.Type == ClaimTypes.UserData).Select(e => e.Value).FirstOrDefault();
+
+            if (string.IsNullOrEmpty(idToken))
+            {
+                _navigation.NavigateTo("/line/signOut");
+                return;
+            }
+            if (!_lineService.ParseIdToken(idToken, out var DescIdToken))
+            {
+                _navigation.NavigateTo("/line/signOut");
+                return;
+            }
+
+            var sub = DescIdToken.Sub;
+            var result = await _lineService.RevokeLineNotify(sub);
+            if (!result)
+            {
+                throw new Exception("解除綁定失敗");
+            }
+            var successTypeName = (ViewModels.loginSuccess)3;
+            SuccessString = Enum.GetName(successTypeName) ?? "";
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex.ToString());
+            var errorTypeName = (ViewModels.loginError)3;
+            ErrorString = Enum.GetName(errorTypeName) ?? "";
+        }
+       
+        StateHasChanged();
+    }
+}

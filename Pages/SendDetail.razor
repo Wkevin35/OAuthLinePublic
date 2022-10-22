@@ -1,0 +1,39 @@
+﻿@page "/sendDetail/{LineNotifySendMtId:guid}"
+@inherits LineBase
+<table>
+    <tr>
+        <th>發送對象</th>
+        <th>是否成功</th>
+        
+    </tr>
+   
+        @foreach(var item in lineNotifySendDts)
+        { <tr>
+            <td><img src="@item.Pic" height="300"/><span>@item.Name</span></td>
+            <td>@(item.isSuccess ? "發送成功": "發送失敗")</td>
+           
+        </tr>
+        }
+    
+</table>
+<button @onclick="@(() => _navigation.NavigateTo("/admin", true))">返回</button>
+@code {
+    [Parameter]
+    public Guid LineNotifySendMtId { get; set; }
+
+    protected List<Models.LineNotifySendDt> lineNotifySendDts = new();
+    protected override void OnParametersSet()
+    {
+        lineNotifySendDts = (from a in _context.LineNotifySendDt
+                             join b in _context.LineIdentity on a.LineIdentityKey equals b.LineIdentityKey into g
+                             from b1 in g.DefaultIfEmpty()
+                             where a.LineNotifySendMtId == LineNotifySendMtId
+                             select new Models.LineNotifySendDt
+                             {
+                                 Pic = b1.Picture,
+                                 Name = b1.Name,
+                                 isSuccess = a.isSuccess,
+                             }
+                          ).ToList();
+    }
+}

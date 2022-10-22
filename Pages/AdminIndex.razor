@@ -1,0 +1,65 @@
+﻿@page "/admin"
+@inherits LineBase
+
+<textarea @oninput="HandleOnChange" placeholder="請輸入傳送的訊息">@inputValue</textarea>
+<button @onclick="send">傳送</button>
+
+@if(!string.IsNullOrEmpty(message))
+{
+    <p>@message</p>
+}
+<hr/>
+<table>
+    <tr>
+        <th>Id</th>
+        <th>發送時間</th>
+        <th>訊息</th>
+        <th>動作</th>
+    </tr>
+   
+        @foreach(var item in LineNotifySendMts)
+        { <tr>
+            <td>@item.LineNotifySendMtKey</td>
+            <td>@item.SendTime.ToString("yyyy/MM/dd HH:mm")</td>
+            <td>@item.Message</td>
+            <td><a href=@($"/sendDetail/{item.LineNotifySendMtId}")>細項</a></td>
+        </tr>
+        }
+    
+</table>
+@code {
+    protected string inputValue = "";
+    protected string message = "";
+
+    protected override void OnInitialized()
+    {
+        getData();
+    }
+    protected async Task send()
+    {
+        if (string.IsNullOrEmpty(inputValue))
+        {
+            message = "請輸入傳送的訊息";
+            return;
+        }
+        var result = await _lineService.SendNotify(inputValue);
+        if (result)
+        {
+            message = "已傳送";
+            getData();
+            return;
+        }
+        message = "傳送失敗";
+    }
+    private void HandleOnChange(ChangeEventArgs args)
+    {
+        inputValue = args.Value.ToString();
+    }
+    protected List<Models.LineNotifySendMt> LineNotifySendMts = new();
+    protected void getData()
+    {
+        this.LineNotifySendMts = _context.LineNotifySendMt.OrderByDescending(e => e.SendTime).ToList();
+        StateHasChanged();
+    }
+
+}

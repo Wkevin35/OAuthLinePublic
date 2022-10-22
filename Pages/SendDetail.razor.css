@@ -1,0 +1,13 @@
+﻿img {
+    height:100px;
+}
+table {
+    width:100%;
+    border: 1px solid black;
+}
+th {
+    border: 1px solid black;
+}
+td {
+    border: 1px solid gray;
+}
